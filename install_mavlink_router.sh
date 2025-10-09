@@ -26,8 +26,27 @@ cleanup_swap() {
 print_progress "Stopping any existing mavlink-router service..."
 sudo systemctl stop mavlink-router
 
+sudo apt update
+sudo apt upgrade -y
+sudo apt install -y wget curl mc tmux dphys-swapfile
+sudo apt install -y ninja-build gcc systemd systemd-dev  pkg-config
+
 # Navigate to home directory
 cd ~
+wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-aarch64.sh
+chmod +x Miniconda3-latest-Linux-aarch64.sh
+./Miniconda3-latest-Linux-aarch64.sh -b -u -p ~/miniconda
+~/miniconda/bin/conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main
+~/miniconda/bin/conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r
+
+~/miniconda/bin/conda create -n RL python==3.11.5 -y
+~/miniconda/bin/conda init
+source ~/miniconda/bin/activate && conda activate RL && pip install meson pymavlink
+source ~/miniconda/bin/activate && conda activate RL && pip install matplotlib sample-factory plotly scipy pymap3d || { echo "sample factory Installation failed"; cleanup_swap; deactivate; exit 1; }
+source ~/miniconda/bin/activate && conda activate RL && pip install torch==2.5 || { echo "torch Installation failed"; cleanup_swap; deactivate; exit 1; }
+source ~/miniconda/bin/activate && conda activate RL && pip install opencv-python-headless || { echo "opencv-python-headless Installation failed"; cleanup_swap; deactivate; exit 1; }
+source ~/miniconda/bin/activate && conda activate RL && pip install modular   || { echo "modular Installation failed"; cleanup_swap; deactivate; exit 1; }
+source ~/miniconda/bin/activate && conda activate RL && pip uninstall sample-factory -y
 
 # Check if mavlink-router is already installed
 if command -v mavlink-routerd &> /dev/null; then
@@ -43,7 +62,7 @@ fi
 
 # Update and install packages
 print_progress "Updating and installing necessary packages..."
-sudo apt update && sudo apt install -y git meson ninja-build pkg-config gcc g++ systemd python3-venv || { echo "Installation of packages failed"; cleanup_swap; exit 1; }
+sudo apt update && sudo apt install -y git meson ninja-build pkg-config gcc g++ systemd systemd-dev python3-venv || { echo "Installation of packages failed"; cleanup_swap; exit 1; }
 
 # Increase swap space for low-memory systems
 print_progress "Increasing swap space..."
@@ -61,15 +80,6 @@ cd mavlink-router || { echo "Changing directory failed"; cleanup_swap; exit 1; }
 print_progress "Fetching submodules..."
 git submodule update --init --recursive || { echo "Submodule update failed"; cleanup_swap; exit 1; }
 
-# Create and activate a virtual environment
-print_progress "Creating and activating a virtual environment..."
-python3 -m venv ~/mavlink-router-venv
-source ~/mavlink-router-venv/bin/activate
-
-# Install Meson in the virtual environment
-print_progress "Installing Meson in the virtual environment..."
-pip install meson || { echo "Meson installation failed"; cleanup_swap; deactivate; exit 1; }
-
 # Build with Meson and Ninja
 print_progress "Setting up the build with Meson..."
 meson setup build . || { echo "Meson setup failed"; cleanup_swap; deactivate; exit 1; }
@@ -80,8 +90,6 @@ ninja -C build || { echo "Ninja build failed"; cleanup_swap; deactivate; exit 1;
 print_progress "Installing mavlink-router..."
 sudo ninja -C build install || { echo "Installation failed"; cleanup_swap; deactivate; exit 1; }
 
-# Deactivate virtual environment and navigate back to home directory
-deactivate
 cd ~
 
 # Print success message
