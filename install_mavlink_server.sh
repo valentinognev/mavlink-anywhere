@@ -43,7 +43,7 @@ chmod +x Miniconda3-latest-Linux-aarch64.sh
 
 ~/miniconda/bin/conda create -n RL python==3.11.5 -y
 ~/miniconda/bin/conda init
-source ~/miniconda/bin/activate && conda activate RL && pip install meson pymavlink
+source ~/miniconda/bin/activate && conda activate RL && pip install meson pymavlink zmq
 source ~/miniconda/bin/activate && conda activate RL && pip install matplotlib sample-factory plotly scipy pymap3d || { echo "sample factory Installation failed"; cleanup_swap; deactivate; exit 1; }
 source ~/miniconda/bin/activate && conda activate RL && pip install torch==2.5 || { echo "torch Installation failed"; cleanup_swap; deactivate; exit 1; }
 source ~/miniconda/bin/activate && conda activate RL && pip install opencv-python-headless || { echo "opencv-python-headless Installation failed"; cleanup_swap; deactivate; exit 1; }
