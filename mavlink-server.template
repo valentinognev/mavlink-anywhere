@@ -87,10 +87,11 @@ streamreq_disable = false
 device = "/dev/ttyAMA0"
 baudrate = 921600
 
-# UDP server endpoints added by configure_endpoints.sh
-[[udp_server]]
-address = "0.0.0.0"
-port = 14550
+# UDP client endpoints added by configure_endpoints.sh
+# Note: udp_client connects outbound (like udpout://), udp_server listens/binds
+[[udp_client]]
+address = "127.0.0.1"
+port = 14540
 
 # TCP server endpoints added by configure_endpoints.sh
 [[tcp_server]]

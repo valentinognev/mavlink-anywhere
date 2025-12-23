@@ -1,0 +1,13 @@
+# MAVLink Server binary
+mavlink-server
+
+# Configuration backups
+*.backup.*
+
+# Logs directory
+logs/
+
+# Temporary files
+*.tmp
+*.temp
+

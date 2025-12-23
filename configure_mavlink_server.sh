@@ -96,13 +96,16 @@ fi
 SERIAL_DEVICE=""
 SERIAL_BAUDRATE=""
 UDP_SERVERS=()
+UDP_CLIENTS=()
 TCP_SERVERS=()
 
 # Parse existing configuration
 in_serial=false
 in_udp_server=false
+in_udp_client=false
 in_tcp_server=false
 UDP_ADDR=""
+UDP_CLIENT_ADDR=""
 TCP_ADDR=""
 
 while IFS= read -r line || [ -n "$line" ]; do
@@ -113,36 +116,53 @@ while IFS= read -r line || [ -n "$line" ]; do
     if [[ "$clean_line" =~ ^\[\[serial\]\] ]]; then
         in_serial=true
         in_udp_server=false
+        in_udp_client=false
         in_tcp_server=false
         UDP_ADDR=""
+        UDP_CLIENT_ADDR=""
         TCP_ADDR=""
         continue
     elif [[ "$clean_line" =~ ^\[\[udp_server\]\] ]]; then
         in_serial=false
         in_udp_server=true
+        in_udp_client=false
         in_tcp_server=false
         UDP_ADDR=""
+        UDP_CLIENT_ADDR=""
+        TCP_ADDR=""
+        continue
+    elif [[ "$clean_line" =~ ^\[\[udp_client\]\] ]]; then
+        in_serial=false
+        in_udp_server=false
+        in_udp_client=true
+        in_tcp_server=false
+        UDP_ADDR=""
+        UDP_CLIENT_ADDR=""
         TCP_ADDR=""
         continue
     elif [[ "$clean_line" =~ ^\[\[tcp_server\]\] ]]; then
         in_serial=false
         in_udp_server=false
+        in_udp_client=false
         in_tcp_server=true
         UDP_ADDR=""
+        UDP_CLIENT_ADDR=""
         TCP_ADDR=""
         continue
     elif [[ "$clean_line" =~ ^\[\[ ]]; then
         # Other table array, stop parsing current section
         in_serial=false
         in_udp_server=false
+        in_udp_client=false
         in_tcp_server=false
         UDP_ADDR=""
+        UDP_CLIENT_ADDR=""
         TCP_ADDR=""
         continue
     fi
     
     # Parse key=value pairs
-    if [ "$in_serial" = true ] || [ "$in_udp_server" = true ] || [ "$in_tcp_server" = true ]; then
+    if [ "$in_serial" = true ] || [ "$in_udp_server" = true ] || [ "$in_udp_client" = true ] || [ "$in_tcp_server" = true ]; then
         result=$(parse_toml_value "$line")
         if [ -n "$result" ]; then
             IFS='|' read -r key value <<< "$result"
@@ -160,6 +180,8 @@ while IFS= read -r line || [ -n "$line" ]; do
                 address)
                     if [ "$in_udp_server" = true ]; then
                         UDP_ADDR="$value"
+                    elif [ "$in_udp_client" = true ]; then
+                        UDP_CLIENT_ADDR="$value"
                     elif [ "$in_tcp_server" = true ]; then
                         TCP_ADDR="$value"
                     fi
@@ -168,6 +190,9 @@ while IFS= read -r line || [ -n "$line" ]; do
                     if [ "$in_udp_server" = true ] && [ -n "$UDP_ADDR" ]; then
                         UDP_SERVERS+=("$UDP_ADDR:$value")
                         UDP_ADDR=""
+                    elif [ "$in_udp_client" = true ] && [ -n "$UDP_CLIENT_ADDR" ]; then
+                        UDP_CLIENTS+=("$UDP_CLIENT_ADDR:$value")
+                        UDP_CLIENT_ADDR=""
                     elif [ "$in_tcp_server" = true ] && [ -n "$TCP_ADDR" ]; then
                         TCP_SERVERS+=("$TCP_ADDR:$value")
                         TCP_ADDR=""
@@ -178,11 +203,11 @@ while IFS= read -r line || [ -n "$line" ]; do
     fi
 done < "$SOURCE_FILE"
 
-# Set defaults if not found
-SERIAL_DEVICE="${SERIAL_DEVICE:-/dev/ttyACM0}"
-SERIAL_BAUDRATE="${SERIAL_BAUDRATE:-115200}"
-if [ ${#UDP_SERVERS[@]} -eq 0 ]; then
-    UDP_SERVERS=("0.0.0.0:14550")
+# Set defaults if not found (matching current mavlink-server.conf)
+SERIAL_DEVICE="${SERIAL_DEVICE:-/dev/ttyAMA0}"
+SERIAL_BAUDRATE="${SERIAL_BAUDRATE:-921600}"
+if [ ${#UDP_CLIENTS[@]} -eq 0 ] && [ ${#UDP_SERVERS[@]} -eq 0 ]; then
+    UDP_CLIENTS=("127.0.0.1:14540")
 fi
 if [ ${#TCP_SERVERS[@]} -eq 0 ]; then
     TCP_SERVERS=("0.0.0.0:5760")
@@ -192,8 +217,13 @@ fi
 print_section "Current Configuration"
 echo "Serial Port:     $SERIAL_DEVICE"
 echo "Serial Baudrate: $SERIAL_BAUDRATE"
-echo "UDP Servers:      ${UDP_SERVERS[*]}"
-echo "TCP Servers:      ${TCP_SERVERS[*]}"
+if [ ${#UDP_CLIENTS[@]} -gt 0 ]; then
+    echo "UDP Clients:     ${UDP_CLIENTS[*]}"
+fi
+if [ ${#UDP_SERVERS[@]} -gt 0 ]; then
+    echo "UDP Servers:     ${UDP_SERVERS[*]}"
+fi
+echo "TCP Servers:     ${TCP_SERVERS[*]}"
 echo ""
 
 # Prompt for new values
@@ -208,22 +238,47 @@ SERIAL_DEVICE="${NEW_SERIAL_DEVICE:-$SERIAL_DEVICE}"
 read -p "Serial baudrate (default: $SERIAL_BAUDRATE): " NEW_SERIAL_BAUDRATE
 SERIAL_BAUDRATE="${NEW_SERIAL_BAUDRATE:-$SERIAL_BAUDRATE}"
 
-read -p "UDP servers (format: X.X.X.X:PORT, multiple separated by space) (default: ${UDP_SERVERS[*]}): " NEW_UDP_INPUT
-if [ -n "$NEW_UDP_INPUT" ]; then
-    # Parse space-separated entries
-    UDP_SERVERS=()
-    for entry in $NEW_UDP_INPUT; do
-        # Validate format X.X.X.X:PORT
-        if [[ "$entry" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+:[0-9]+$ ]]; then
-            UDP_SERVERS+=("$entry")
-        else
-            echo "Warning: Invalid UDP format '$entry'. Expected format: X.X.X.X:PORT" >&2
+# Prompt for UDP clients (if any exist or default)
+if [ ${#UDP_CLIENTS[@]} -gt 0 ]; then
+    read -p "UDP clients (format: X.X.X.X:PORT, multiple separated by space) (default: ${UDP_CLIENTS[*]}): " NEW_UDP_CLIENT_INPUT
+    if [ -n "$NEW_UDP_CLIENT_INPUT" ]; then
+        # Parse space-separated entries
+        UDP_CLIENTS=()
+        for entry in $NEW_UDP_CLIENT_INPUT; do
+            # Validate format X.X.X.X:PORT
+            if [[ "$entry" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+:[0-9]+$ ]]; then
+                UDP_CLIENTS+=("$entry")
+            else
+                echo "Warning: Invalid UDP client format '$entry'. Expected format: X.X.X.X:PORT" >&2
+            fi
+        done
+        # If parsing failed, keep defaults
+        if [ ${#UDP_CLIENTS[@]} -eq 0 ]; then
+            echo "Keeping default UDP clients due to invalid input."
+            UDP_CLIENTS=("127.0.0.1:14540")
         fi
-    done
-    # If parsing failed, keep defaults
-    if [ ${#UDP_SERVERS[@]} -eq 0 ]; then
-        echo "Keeping default UDP servers due to invalid input."
-        UDP_SERVERS=("0.0.0.0:14550")
+    fi
+fi
+
+# Prompt for UDP servers (if any exist)
+if [ ${#UDP_SERVERS[@]} -gt 0 ]; then
+    read -p "UDP servers (format: X.X.X.X:PORT, multiple separated by space) (default: ${UDP_SERVERS[*]}): " NEW_UDP_INPUT
+    if [ -n "$NEW_UDP_INPUT" ]; then
+        # Parse space-separated entries
+        UDP_SERVERS=()
+        for entry in $NEW_UDP_INPUT; do
+            # Validate format X.X.X.X:PORT
+            if [[ "$entry" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+:[0-9]+$ ]]; then
+                UDP_SERVERS+=("$entry")
+            else
+                echo "Warning: Invalid UDP server format '$entry'. Expected format: X.X.X.X:PORT" >&2
+            fi
+        done
+        # If parsing failed, keep defaults
+        if [ ${#UDP_SERVERS[@]} -eq 0 ]; then
+            echo "Keeping default UDP servers due to invalid input."
+            UDP_SERVERS=("0.0.0.0:14550")
+        fi
     fi
 fi
 
@@ -250,7 +305,12 @@ fi
 print_section "New Configuration Summary"
 echo "Serial Port:     $SERIAL_DEVICE"
 echo "Serial Baudrate: $SERIAL_BAUDRATE"
-echo "UDP Servers:     ${UDP_SERVERS[*]}"
+if [ ${#UDP_CLIENTS[@]} -gt 0 ]; then
+    echo "UDP Clients:    ${UDP_CLIENTS[*]}"
+fi
+if [ ${#UDP_SERVERS[@]} -gt 0 ]; then
+    echo "UDP Servers:     ${UDP_SERVERS[*]}"
+fi
 echo "TCP Servers:     ${TCP_SERVERS[*]}"
 echo ""
 
@@ -271,6 +331,7 @@ fi
 TEMP_FILE=$(mktemp)
 in_serial=false
 in_udp_server=false
+in_udp_client=false
 in_tcp_server=false
 serial_written=false
 skip_section=false
@@ -297,8 +358,18 @@ while IFS= read -r line || [ -n "$line" ]; do
         skip_section=false
         in_serial=false
         in_udp_server=true
+        in_udp_client=false
         in_tcp_server=false
         # Skip old UDP server entries, we'll write all new ones at once
+        skip_section=true
+        continue
+    elif [[ "$clean_line" =~ ^\[\[udp_client\]\] ]]; then
+        skip_section=false
+        in_serial=false
+        in_udp_server=false
+        in_udp_client=true
+        in_tcp_server=false
+        # Skip old UDP client entries, we'll write all new ones at once
         skip_section=true
         continue
     elif [[ "$clean_line" =~ ^\[\[tcp_server\]\] ]]; then
@@ -314,6 +385,7 @@ while IFS= read -r line || [ -n "$line" ]; do
         skip_section=false
         in_serial=false
         in_udp_server=false
+        in_udp_client=false
         in_tcp_server=false
     fi
     
@@ -345,6 +417,19 @@ if [ "$serial_written" = false ]; then
     echo "[[serial]]" >> "$TEMP_FILE"
     echo "device = \"$SERIAL_DEVICE\"" >> "$TEMP_FILE"
     echo "baudrate = $SERIAL_BAUDRATE" >> "$TEMP_FILE"
+fi
+
+# Write UDP client sections (always write all, replacing old ones)
+if [ ${#UDP_CLIENTS[@]} -gt 0 ]; then
+    echo "" >> "$TEMP_FILE"
+    echo "# UDP client endpoints added by configure_endpoints.sh" >> "$TEMP_FILE"
+    echo "# Note: udp_client connects outbound (like udpout://), udp_server listens/binds" >> "$TEMP_FILE"
+    for client in "${UDP_CLIENTS[@]}"; do
+        IFS=':' read -r address port <<< "$client"
+        echo "[[udp_client]]" >> "$TEMP_FILE"
+        echo "address = \"$address\"" >> "$TEMP_FILE"
+        echo "port = $port" >> "$TEMP_FILE"
+    done
 fi
 
 # Write UDP server sections (always write all, replacing old ones)
