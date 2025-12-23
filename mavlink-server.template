@@ -1,0 +1,98 @@
+# MAVLink-Server Configuration File Template
+# This file contains default options for mavlink-server program
+# Based on documentation from mavlink-server.md
+
+# ============================================================================
+# Web Server Configuration
+# ============================================================================
+
+# HTTP/WebSocket server bind address
+# Default: 0.0.0.0:8080
+# Format: <IP>:<PORT>
+web_server = "0.0.0.0:8080"
+
+# Default REST API version (removes path prefix)
+# Default: 1
+default_api_version = 1
+
+# ============================================================================
+# Logging Configuration
+# ============================================================================
+
+# Enable verbose/debug logs
+# Default: false
+verbose = false
+
+# Directory for logs
+# Default: ./logs
+log_path = "./logs"
+
+# Enable detailed trace logs in log file
+# Default: false
+enable_tracing_level_log_file = false
+
+# ============================================================================
+# MAVLink Protocol Configuration
+# ============================================================================
+
+# MAVLink protocol version
+# Options: 1 or 2
+# Default: 2
+mavlink_version = 2
+
+# MAVLink System ID
+# Default: 1
+mavlink_system_id = 1
+
+# MAVLink Component ID
+# Default: 191
+mavlink_component_id = 191
+
+# Heartbeat frequency in Hz
+# Default: 1
+mavlink_heartbeat_frequency = 1
+
+# Send initial burst of heartbeats (0.1s apart)
+# Default: false
+send_initial_heartbeats = false
+
+# ============================================================================
+# Network Configuration
+# ============================================================================
+
+# UDP client inactivity timeout in seconds
+# Default: 10
+udp_server_timeout = 10
+
+# Disable stream requests (not implemented)
+# Default: false
+streamreq_disable = false
+
+# ============================================================================
+# Zenoh Configuration
+# ============================================================================
+
+# Path to Zenoh config file
+# Default: (not set)
+# zenoh_config_file = "/path/to/zenoh/config.toml"
+
+# ============================================================================
+# Serial Endpoints Configuration
+# ============================================================================
+# Serial communication endpoints
+# Format: serial://<device>?baudrate=<baudrate>
+#
+# Example serial endpoints (uncomment and modify as needed):
+[[serial]]
+device = "/dev/ttyAMA0"
+baudrate = 921600
+
+# UDP server endpoints added by configure_endpoints.sh
+[[udp_server]]
+address = "0.0.0.0"
+port = 14550
+
+# TCP server endpoints added by configure_endpoints.sh
+[[tcp_server]]
+address = "0.0.0.0"
+port = 5760
