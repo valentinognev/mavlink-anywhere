@@ -6,7 +6,7 @@
 set -e
 
 CONFIG_FILE="${1:-mavlink-server.conf}"
-TEMPLATE_FILE="mavlink-server.template"
+TEMPLATE_FILE="mavlink-server.conf.template"
 
 # Function to print section headers
 print_section() {

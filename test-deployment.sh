@@ -25,7 +25,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEPLOY_SCRIPT="${SCRIPT_DIR}/mavlink-server-deploy.sh"
 UNDEPLOY_SCRIPT="${SCRIPT_DIR}/mavlink-server-undeploy.sh"
 CONFIGURE_SCRIPT="${SCRIPT_DIR}/configure_mavlink_server.sh"
-TEMPLATE_FILE="${SCRIPT_DIR}/mavlink-server.template"
+TEMPLATE_FILE="${SCRIPT_DIR}/mavlink-server.conf.template"
 # Fallback to alternative template file names
 if [ ! -f "$TEMPLATE_FILE" ]; then
     if [ -f "${SCRIPT_DIR}/mavlink-server.template" ]; then
